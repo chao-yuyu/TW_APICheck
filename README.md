@@ -18,7 +18,7 @@
 
 ### 🚀 技術特色
 - 🚀 **FastAPI框架**：簡單易用的HTTP API接口
-- 🔄 **雙重爬蟲策略**：結合requests和selenium確保資料獲取成功
+- 🔄 **爬蟲策略**：結合requests和selenium確保資料獲取成功
 - 🌐 **CORS支援**：允許跨域請求，方便前端整合
 
 ## 🚀 快速開始
