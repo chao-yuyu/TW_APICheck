@@ -1,14 +1,23 @@
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, Query, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup
+import time
+import chromedriver_autoinstaller
 from weather_scraper import WeatherScraper
 import json
 import urllib.parse
 from typing import Dict, Any, List
 
+# 自動安裝 ChromeDriver
+chromedriver_autoinstaller.install()
+
+# 創建單一的 FastAPI 應用實例
 app = FastAPI(
-    title="台灣天氣降雨機率API",
-    description="獲取台灣各縣市的降雨機率，判斷是否會下雨（>=50%機率）",
+    title="台灣天氣降雨機率API + 公車站牌API",
+    description="獲取台灣各縣市的降雨機率，判斷是否會下雨（>=50%機率）+ 公車站牌動態資訊",
     version="1.0.0"
 )
 
@@ -32,6 +41,47 @@ TAIWAN_CITIES = [
     "宜蘭縣", "澎湖縣", "金門縣", "連江縣"
 ]
 
+# 公車站牌動態資訊爬蟲函數
+async def fetch_stop_dynamic(slid: int):
+    url = f'https://pda5284.gov.taipei/MQS/stoplocation.jsp?slid={slid}'
+
+    options = Options()
+    options.add_argument("--headless")  # 無頭模式
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(options=options)
+    
+    try:
+        driver.get(url)
+        time.sleep(2)
+
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        
+        rows = soup.select('tr.ttego1, tr.ttego2')
+        data = []
+        for tr in rows:
+            cols = tr.find_all('td')
+            if len(cols) >= 4:
+                eta_td = cols[3]
+                data.append({
+                    'route': cols[0].text.strip(),
+                    'stop_name': cols[1].text.strip(),
+                    'direction': cols[2].text.strip(),
+                    'eta': eta_td.text.strip(),
+                    'eta_flag': eta_td.get('data-deptimen1', '')
+                })
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"爬蟲錯誤：{str(e)}")
+    finally:
+        driver.quit()
+
+# 公車站牌 API 端點
+@app.get("/bus_stop")
+async def get_bus_stop(slid: int = Query(..., description="站牌 ID")):
+    """獲取公車站牌動態資訊"""
+    return await fetch_stop_dynamic(slid)
+
 def decode_city_name(city_name: str) -> str:
     """解碼城市名稱，處理URL編碼"""
     try:
@@ -46,28 +96,20 @@ def decode_city_name(city_name: str) -> str:
 async def home():
     """API首頁"""
     return {
-        "message": "台灣天氣降雨機率API",
-        "description": "獲取台灣各縣市的降雨機率，判斷是否會下雨（>=50%機率）",
+        "message": "台灣天氣降雨機率API + 公車站牌API",
+        "description": "獲取台灣各縣市的降雨機率，判斷是否會下雨（>=50%機率）+ 公車站牌動態資訊",
         "endpoints": {
             "/weather": "獲取預設城市（台北市）的天氣狀態",
             "/weather/{city}": "獲取指定城市的天氣狀態",
             "/cities": "獲取支援的城市列表",
-            "/encode/{city}": "獲取城市名稱的URL編碼（測試用）"
+            "/encode/{city}": "獲取城市名稱的URL編碼（測試用）",
+            "/bus_stop": "獲取公車站牌動態資訊（需要 slid 參數）"
         },
         "usage_examples": {
-            "直接中文": "http://localhost:8000/weather/臺北市",
-            "URL編碼": "http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
+            "天氣_直接中文": "http://localhost:8000/weather/臺北市",
+            "天氣_URL編碼": "http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
+            "公車站牌": "http://localhost:8000/bus_stop?slid=1417",
             "說明": "✅ 可以直接使用中文，瀏覽器會自動編碼"
-        },
-        "example": {
-            "url": "/weather/臺北市",
-            "response": {
-                "status": "success",
-                "city": "臺北市",
-                "rain_probability": 75,
-                "will_rain": True,
-                "message": "rain"
-            }
         },
         "docs": "/docs",
         "redoc": "/redoc"
@@ -162,7 +204,8 @@ async def health_check():
     return {
         "status": "healthy",
         "message": "API服務正常運行",
-        "encoding_support": "✅ 支援中文城市名稱直接輸入"
+        "encoding_support": "✅ 支援中文城市名稱直接輸入",
+        "bus_stop_support": "✅ 支援公車站牌動態資訊查詢"
     }
 
 @app.exception_handler(404)
@@ -173,8 +216,8 @@ async def not_found_handler(request, exc):
         content={
             "status": "error",
             "message": "找不到請求的端點",
-            "available_endpoints": ["/", "/weather", "/weather/{city}", "/cities", "/encode/{city}", "/health"],
-            "tip": "城市名稱可以直接使用中文，如: /weather/臺北市",
+            "available_endpoints": ["/", "/weather", "/weather/{city}", "/cities", "/encode/{city}", "/health", "/bus_stop"],
+            "tip": "城市名稱可以直接使用中文，如: /weather/臺北市；公車站牌: /bus_stop?slid=1417",
             "docs": "訪問 /docs 查看完整API文檔"
         }
     )
@@ -182,19 +225,21 @@ async def not_found_handler(request, exc):
 if __name__ == '__main__':
     import uvicorn
     
-    print("🌦️  台灣天氣降雨機率API啟動中...")
+    print("🌦️  台灣天氣降雨機率API + 🚌 公車站牌API 啟動中...")
     print("📍 支援的城市:", ", ".join(TAIWAN_CITIES[:5]), "等", len(TAIWAN_CITIES), "個城市")
     print("🔗 API端點:")
     print("   - GET /weather - 獲取台北市天氣")
     print("   - GET /weather/{city} - 獲取指定城市天氣")
     print("   - GET /cities - 獲取支援城市列表")
     print("   - GET /encode/{city} - 獲取城市URL編碼")
+    print("   - GET /bus_stop?slid={站牌ID} - 獲取公車站牌動態資訊")
     print("   - GET /health - 健康檢查")
     print("   - GET /docs - 自動生成的API文檔")
     print("   - GET /redoc - ReDoc格式的API文檔")
     print("\n📋 使用範例:")
     print("   🎯 直接中文: curl 'http://localhost:8000/weather/臺北市'")
     print("   🔗 URL編碼: curl http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82")
+    print("   🚌 公車站牌: curl 'http://localhost:8000/bus_stop?slid=1417'")
     print("   ✨ 兩種方式都支援！")
     print("   📚 API文檔: http://localhost:8000/docs")
     
