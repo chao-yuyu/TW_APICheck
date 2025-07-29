@@ -444,7 +444,7 @@ for bus in bus_data:
   - 備用：requests + BeautifulSoup（靜態內容）
 - **目標網站**：
   - 天氣資料：[中央氣象署縣市預報](https://www.cwa.gov.tw/V8/C/W/County/index.html)
-  - 公車資料：[台北市公車動態資訊系統](https://pda5284.gov.taipei/MQS/stoplocation.jsp)
+  - 公車資料：[台北市公車動態資訊系統](https://pda5284.gov.taipei/MQS)
 - **資料解析**：正則表達式 + HTML解析
 - **編碼處理**：UTF-8 + URL編碼自動轉換
 - **瀏覽器自動化**：ChromeDriver 自動安裝和配置
