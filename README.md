@@ -7,7 +7,7 @@
 - 🌧️ **即時天氣資料**：爬取中央氣象署官方網站
 - 🎯 **智能判斷**：降雨機率≥50%自動判定為"rain"，否則為"no_rain"
 - 🏙️ **支援全台縣市**：涵蓋22個縣市的天氣資料
-- 🚀 **RESTful API**：簡單易用的HTTP API接口
+- 🚀 **FastAPI框架**：簡單易用的HTTP API接口
 - 🔄 **雙重爬蟲策略**：結合requests和selenium確保資料獲取成功
 - 🌐 **中文支援**：完整支援中文城市名稱，自動處理URL編碼
 
@@ -25,7 +25,12 @@ pip install -r requirements.txt
 python app.py
 ```
 
-服務將在 `http://localhost:5000` 啟動
+服務將在 `http://localhost:8000` 啟動
+
+### 查看API文檔
+
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
 
 ## 📡 API端點詳細說明
 
@@ -40,18 +45,20 @@ GET /
 ```json
 {
   "message": "台灣天氣降雨機率API",
-  "description": "獲取台灣各縣市的降雨機率，判斷是否會下雨（≥50%機率）",
+  "description": "獲取台灣各縣市的降雨機率，判斷是否會下雨（>=50%機率）",
   "endpoints": {
     "/weather": "獲取預設城市（台北市）的天氣狀態",
-    "/weather/<city>": "獲取指定城市的天氣狀態",
+    "/weather/{city}": "獲取指定城市的天氣狀態",
     "/cities": "獲取支援的城市列表",
-    "/encode/<city>": "獲取城市名稱的URL編碼（測試用）"
+    "/encode/{city}": "獲取城市名稱的URL編碼（測試用）"
   },
   "usage_examples": {
-    "直接中文": "http://localhost:5000/weather/臺北市",
-    "URL編碼": "http://localhost:5000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
+    "直接中文": "http://localhost:8000/weather/臺北市",
+    "URL編碼": "http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
     "說明": "✅ 可以直接使用中文，瀏覽器會自動編碼"
-  }
+  },
+  "docs": "/docs",
+  "redoc": "/redoc"
 }
 ```
 
@@ -64,14 +71,14 @@ GET /weather
 
 **使用範例**：
 ```bash
-curl http://localhost:5000/weather
+curl http://localhost:8000/weather
 ```
 
 **回應範例**：
 ```json
 {
   "status": "success",
-  "rain_probability": 65,
+  "rain_probability": 75,
   "will_rain": true,
   "message": "rain",
   "city": "臺北市"
@@ -80,7 +87,7 @@ curl http://localhost:5000/weather
 
 ### 3. 指定城市天氣查詢 - 主要功能
 ```http
-GET /weather/<city>
+GET /weather/{city}
 ```
 
 **功能**：獲取指定城市的降雨機率和天氣狀態
@@ -92,22 +99,22 @@ GET /weather/<city>
 **使用範例**：
 ```bash
 # 方法1：直接使用中文（推薦）
-curl "http://localhost:5000/weather/臺北市"
-curl "http://localhost:5000/weather/高雄市"
-curl "http://localhost:5000/weather/臺中市"
+curl "http://localhost:8000/weather/臺北市"
+curl "http://localhost:8000/weather/高雄市"
+curl "http://localhost:8000/weather/臺中市"
 
 # 方法2：手動URL編碼
-curl "http://localhost:5000/weather/%E8%87%BA%E5%8C%97%E5%B8%82"
+curl "http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82"
 ```
 
 **成功回應**：
 ```json
 {
   "status": "success",
-  "rain_probability": 75,
+  "rain_probability": 65,
   "will_rain": true,
   "message": "rain",
-  "city": "臺北市"
+  "city": "高雄市"
 }
 ```
 
@@ -132,7 +139,7 @@ GET /cities
 
 **使用範例**：
 ```bash
-curl http://localhost:5000/cities
+curl http://localhost:8000/cities
 ```
 
 **回應範例**：
@@ -152,14 +159,14 @@ curl http://localhost:5000/cities
 
 ### 5. URL編碼工具 - 測試輔助
 ```http
-GET /encode/<city>
+GET /encode/{city}
 ```
 
 **功能**：將中文城市名稱轉換為URL編碼格式，用於測試和調試
 
 **使用範例**：
 ```bash
-curl http://localhost:5000/encode/臺北市
+curl http://localhost:8000/encode/臺北市
 ```
 
 **回應範例**：
@@ -168,8 +175,8 @@ curl http://localhost:5000/encode/臺北市
   "status": "success",
   "original": "臺北市",
   "encoded": "%E8%87%BA%E5%8C%97%E5%B8%82",
-  "encoded_url": "http://localhost:5000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
-  "direct_url": "http://localhost:5000/weather/臺北市",
+  "encoded_url": "http://localhost:8000/weather/%E8%87%BA%E5%8C%97%E5%B8%82",
+  "direct_url": "http://localhost:8000/weather/臺北市",
   "note": "兩種URL都可以使用"
 }
 ```
@@ -183,7 +190,7 @@ GET /health
 
 **使用範例**：
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:8000/health
 ```
 
 **回應範例**：
@@ -200,12 +207,12 @@ curl http://localhost:5000/health
 ### 場景1：檢查台北市是否會下雨
 ```bash
 # 請求
-curl "http://localhost:5000/weather/臺北市"
+curl "http://localhost:8000/weather/臺北市"
 
 # 回應
 {
   "status": "success",
-  "rain_probability": 85,
+  "rain_probability": 75,
   "will_rain": true,
   "message": "rain",
   "city": "臺北市"
@@ -215,26 +222,29 @@ curl "http://localhost:5000/weather/臺北市"
 ### 場景2：批量查詢多個城市
 ```bash
 # 查詢台北市
-curl "http://localhost:5000/weather/臺北市"
+curl "http://localhost:8000/weather/臺北市"
 
 # 查詢高雄市
-curl "http://localhost:5000/weather/高雄市"
+curl "http://localhost:8000/weather/高雄市"
 
 # 查詢台中市
-curl "http://localhost:5000/weather/臺中市"
+curl "http://localhost:8000/weather/臺中市"
 ```
 
 ### 場景3：在網頁瀏覽器中使用
 ```
 直接在瀏覽器網址列輸入：
-http://localhost:5000/weather/臺北市
-http://localhost:5000/weather/高雄市
+http://localhost:8000/weather/臺北市
+http://localhost:8000/weather/高雄市
+
+或查看交互式API文檔：
+http://localhost:8000/docs
 ```
 
 ### 場景4：JavaScript/Ajax請求
 ```javascript
 // 使用fetch API
-fetch('http://localhost:5000/weather/臺北市')
+fetch('http://localhost:8000/weather/臺北市')
   .then(response => response.json())
   .then(data => {
     console.log('降雨機率:', data.rain_probability + '%');
@@ -242,11 +252,24 @@ fetch('http://localhost:5000/weather/臺北市')
   });
 
 // 使用jQuery
-$.get('http://localhost:5000/weather/臺北市', function(data) {
+$.get('http://localhost:8000/weather/臺北市', function(data) {
   if (data.status === 'success') {
     alert(`${data.city}降雨機率: ${data.rain_probability}%`);
   }
 });
+```
+
+### 場景5：Python requests
+```python
+import requests
+
+# 查詢天氣
+response = requests.get('http://localhost:8000/weather/臺北市')
+data = response.json()
+
+if data['status'] == 'success':
+    print(f"{data['city']} 降雨機率: {data['rain_probability']}%")
+    print(f"會下雨嗎: {'會' if data['will_rain'] else '不會'}")
 ```
 
 ## 🏙️ 支援城市
@@ -292,13 +315,15 @@ $.get('http://localhost:5000/weather/臺北市', function(data) {
 
 ## 🔧 技術架構
 
-- **Web框架**：Flask + Flask-CORS
+- **Web框架**：FastAPI + CORS中間件
+- **ASGI服務器**：Uvicorn
 - **爬蟲技術**：
   - 主要：Selenium WebDriver（處理動態內容）
   - 備用：requests + BeautifulSoup（靜態內容）
 - **目標網站**：[中央氣象署縣市預報](https://www.cwa.gov.tw/V8/C/W/County/index.html)
 - **資料解析**：正則表達式 + HTML解析
 - **編碼處理**：UTF-8 + URL編碼自動轉換
+- **API文檔**：自動生成 Swagger UI 和 ReDoc
 
 ## 🛠️ 開發測試
 
@@ -313,42 +338,19 @@ python weather_scraper.py
 python app.py
 
 # 健康檢查
-curl http://localhost:5000/health
+curl http://localhost:8000/health
 
 # 測試預設城市
-curl http://localhost:5000/weather
+curl http://localhost:8000/weather
 
 # 測試指定城市
-curl "http://localhost:5000/weather/臺北市"
+curl "http://localhost:8000/weather/臺北市"
 
 # 查看支援城市
-curl http://localhost:5000/cities
-```
+curl http://localhost:8000/cities
 
-### API測試腳本
-```bash
-#!/bin/bash
-echo "=== API測試腳本 ==="
-
-echo "1. 健康檢查"
-curl http://localhost:5000/health
-echo -e "\n"
-
-echo "2. 預設城市（台北市）"
-curl http://localhost:5000/weather
-echo -e "\n"
-
-echo "3. 指定城市測試"
-curl "http://localhost:5000/weather/高雄市"
-echo -e "\n"
-
-echo "4. 支援城市列表"
-curl http://localhost:5000/cities
-echo -e "\n"
-
-echo "5. 錯誤測試（不支援的城市）"
-curl "http://localhost:5000/weather/不存在市"
-echo -e "\n"
+# 查看API文檔
+open http://localhost:8000/docs
 ```
 
 ## ⚠️ 注意事項
@@ -359,6 +361,7 @@ echo -e "\n"
 4. **網路連線**：需要穩定的網路連線來存取氣象署網站
 5. **城市名稱**：請使用完整正確的縣市名稱（如"臺北市"而非"台北"）
 6. **編碼問題**：API完全支援中文，瀏覽器會自動處理URL編碼
+7. **端口變更**：FastAPI版本使用8000端口（原Flask版本使用5000端口）
 
 ## 🔍 故障排除
 
@@ -367,7 +370,7 @@ echo -e "\n"
 **Q: 城市名稱錯誤怎麼辦？**
 ```bash
 # 查看支援的城市列表
-curl http://localhost:5000/cities
+curl http://localhost:8000/cities
 
 # 使用完整縣市名稱，例如：
 # ✅ 正確："臺北市"、"高雄市"
